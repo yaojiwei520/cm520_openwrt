@@ -29,7 +29,13 @@ sed -i 's/net.netfilter.nf_conntrack_max=.*/net.netfilter.nf_conntrack_max=16553
 
 # cpufreq
 sed -i 's/LUCI_DEPENDS.*/LUCI_DEPENDS:=\@\(arm\|\|aarch64\)/g' feeds/luci/applications/luci-app-cpufreq/Makefile
-sed -i 's/services/system/g' feeds/luci/applications/luci-app-cpufreq/luasrc/controller/cpufreq.lua
+# 确保文件存在
+if [ ! -e "feeds/luci/application/luci-app-cpufreq/luasrc/controller/cpufreq.lua" ]; then
+    echo "Error: feeds/luci/application/luci-app-cpufreq/luasrc/controller/cpufreq.lua not found!"
+    echo "Please make sure you have update and install luci-app-cpufreq via feeds"
+  exit 1
+fi
+sed -i 's/services/system/g' feeds/luci/application/luci-app-cpufreq/luasrc/controller/cpufreq.lua
 
 # Timezone
 sed -i "s/'UTC'/'CST-8'\n   set system.@system[-1].zonename='Asia\/Shanghai'/g" package/base-files/files/bin/config_generate
