@@ -86,6 +86,8 @@ jobs:
         chmod +x $DIY_P1_SH
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P1_SH
+        ./scripts/feeds update luci
+        ./scripts/feeds install luci-app-cpufreq
 
     - name: Update feeds
       run: cd openwrt && ./scripts/feeds update -a
