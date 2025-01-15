@@ -187,7 +187,7 @@ jobs:
 #      uses: softprops/action-gh-release@v1
 #      if: steps.tag.outputs.status == 'success' && !cancelled()
 #      env:
-#        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#        GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
 #      with:
 #        tag_name: ${{ steps.tag.outputs.release_tag }}
 #        body_path: release.txt
@@ -206,7 +206,7 @@ jobs:
 #        keep_latest: 14
 #        delete_tags: true
 #      env:
-#        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#        GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
 
     - name: Upload OpenWrt Firmware to Release
       uses: ncipollo/release-action@v1
@@ -216,7 +216,7 @@ jobs:
         artifacts: ${{ env.FIRMWARE }}/*
         allowUpdates: true
         removeArtifacts: true
-        token: ${{ secrets.GITHUB_TOKEN }}
+        token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
         body: |
           * 星际宝盒CM520-Box&immortalwrt固件
           * AdGuardHome-Home
