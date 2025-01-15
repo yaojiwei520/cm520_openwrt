@@ -1,3 +1,4 @@
+
 #!/bin/bash
 #=================================================
 # Description: DIY script
@@ -8,7 +9,7 @@
 # Modify default IP
 sed -i 's/192.168.1.1/10.10.10.1/g' package/base-files/files/bin/config_generate
 # 修改机器名称
-sed -i 's/ImmortalWrt/CM520-Box/g' package/base-files/files/bin/config_generate
+sed -i 's/ImmortalWrt/CM520-79F-box/g' package/base-files/files/bin/config_generate
 # 修改机器初始密码
 #sed -i 's/root::0:0:99999:7:::/root::0:0:99999:7:::/g' package/base-files/files/etc/shadow
 # zerotier
@@ -29,13 +30,7 @@ sed -i 's/net.netfilter.nf_conntrack_max=.*/net.netfilter.nf_conntrack_max=16553
 
 # cpufreq
 sed -i 's/LUCI_DEPENDS.*/LUCI_DEPENDS:=\@\(arm\|\|aarch64\)/g' feeds/luci/applications/luci-app-cpufreq/Makefile
-# 确保文件存在
-if [ ! -e "feeds/luci/application/luci-app-cpufreq/luasrc/controller/cpufreq.lua" ]; then
-    echo "Error: feeds/luci/application/luci-app-cpufreq/luasrc/controller/cpufreq.lua not found!"
-    echo "Please make sure you have update and install luci-app-cpufreq via feeds"
-  exit 1
-fi
-sed -i 's/services/system/g' feeds/luci/application/luci-app-cpufreq/luasrc/controller/cpufreq.lua
+sed -i 's/services/system/g' feeds/luci/applications/luci-app-cpufreq/luasrc/controller/cpufreq.lua
 
 # Timezone
 sed -i "s/'UTC'/'CST-8'\n   set system.@system[-1].zonename='Asia\/Shanghai'/g" package/base-files/files/bin/config_generate
