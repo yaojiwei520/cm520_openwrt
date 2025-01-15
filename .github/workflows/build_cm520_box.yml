@@ -1,14 +1,3 @@
-
-#
-# Copyright (c) 2019-2020 P3TERX <https://p3terx.com>
-#
-# This is free software, licensed under the MIT License.
-# See /LICENSE for more information.
-#
-# https://github.com/P3TERX/Actions-OpenWrt
-# Description: Build OpenWrt using GitHub Actions
-#
-
 name: CM520_for_immortalwrt_AdGuardHome
 
 on:
@@ -20,23 +9,12 @@ on:
         required: false
         default: 'false'
   push:
-#    branches:
-#      - master
     paths:
       - 'Config_Files/CM520_for_immortalwrt_AdGuardHome.config'
-#  schedule:
-#    - cron: 0 2 * * 5
-#  watch:
-#    types: started
 
 env:
-  #REPO_URL: https://github.com/Lienol/openwrt
-  #REPO_BRANCH: 21.02
-  #REPO_BRANCH: 22.03
   REPO_URL: https://github.com/immortalwrt/immortalwrt
-  #REPO_BRANCH: openwrt-21.02
   REPO_BRANCH: openwrt-23.05
-  #REPO_BRANCH: master
   FEEDS_CONF: feeds.conf.default
   CONFIG_FILE: Config_Files/CM520_for_immortalwrt_AdGuardHome.config
   DIY_P1_SH: DIY/diy-part1-immortalwrt.sh
@@ -51,66 +29,80 @@ env:
 jobs:
   build:
     runs-on: ubuntu-22.04
+    permissions:
+      contents: write # 授权 workflow 写入 release 的权限
 
     steps:
-    - name: Checkout
+    - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Initialization environment
+    - name: Initialize environment
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
+        # Remove unnecessary software
         sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
+
+        # Update and install dependencies
         sudo -E apt-get -qq update
-        #sudo -E apt-get -qq install $(curl -fsSL git.io/depends-ubuntu-latest)
         sudo -E apt-get -qq install $(curl -fsSL https://is.gd/depends_ubuntu_2204)
-        #sudo -E apt-get -qq install $(curl -fsSL https://raw.githubusercontent.com/2286927/OpenWrtDependenciesList/main/ImmortalWrt-master-List )
-        #sudo -E bash -c 'bash <(curl -s https://build-scripts.immortalwrt.eu.org/init_build_environment.sh)'
-        #sudo -E snap install clangd --classic
+
+        # Clean up system
         sudo -E apt-get -qq autoremove --purge
         sudo -E apt-get -qq clean
+
+        # Set timezone and create working directory
         sudo timedatectl set-timezone "$TZ"
         sudo mkdir -p /workdir
         sudo chown $USER:$GROUPS /workdir
 
-    - name: Clone source code
+    - name: Clone OpenWrt source code
       working-directory: /workdir
       run: |
-        df -hT $PWD
+        df -hT $PWD # Print disk usage
         git clone $REPO_URL -b $REPO_BRANCH openwrt
         ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
 
-    - name: Load custom feeds
+    - name: Load custom feeds and update
       run: |
+        # Move feeds.conf if exists
         [ -e $FEEDS_CONF ] && mv $FEEDS_CONF openwrt/feeds.conf.default
+        
+        # Execute DIY part 1 script
         chmod +x $DIY_P1_SH
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P1_SH
+
+        # Update and install luci feed and related package
         ./scripts/feeds update luci
         ./scripts/feeds install luci-app-cpufreq
 
-    - name: Update feeds
-      run: cd openwrt && ./scripts/feeds update -a
 
-    - name: Install feeds
-      run: cd openwrt && ./scripts/feeds install -a
-
-    - name: Load custom configuration
+    - name: Update and Install feeds
       run: |
-        [ -e files ] && mv files openwrt/files
-        [ -e $CONFIG_FILE ] && mv $CONFIG_FILE openwrt/.config
-        chmod +x $DIY_P2_SH
         cd openwrt
+        ./scripts/feeds update -a
+        ./scripts/feeds install -a
+
+    - name: Load custom configuration and execute DIY part 2 script
+      run: |
+        # Move custom files and configuration
+        cd openwrt
+        [ -e ../files ] && mv ../files ./files
+        [ -e ../$CONFIG_FILE ] && mv ../$CONFIG_FILE ./.config
+
+        # Execute DIY part 2 script
+        chmod +x $GITHUB_WORKSPACE/$DIY_P2_SH
         $GITHUB_WORKSPACE/$DIY_P2_SH
 
-#    - name: SSH connection to Actions
+#    - name: SSH connection to Actions (Optional)
 #      uses: P3TERX/ssh2actions@v1.0.0
 #      if: (github.event.inputs.ssh == 'true' && github.event.inputs.ssh  != 'false') || contains(github.event.action, 'ssh')
 #      env:
 #        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 #        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
 
-    - name: Download package
+    - name: Download packages
       id: package
       run: |
         cd openwrt
@@ -119,39 +111,43 @@ jobs:
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
 
-    - name: Compile the firmware
+    - name: Compile firmware
       id: compile
       run: |
         cd openwrt
         echo -e "$(nproc) thread compile"
         make -j$(nproc) || make -j2 || make -j2 V=s
         echo "::setOutput name=status::success"
+
+        # Get device name, date
         grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
         [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
         echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
-        echo "DATE=$(date "+%Y-%m-%d %H:%M:%S")" >> $GITHUB_ENV
+        echo "DATE=$(date '+%Y-%m-%d %H:%M:%S')" >> $GITHUB_ENV
 
-    - name: Check space usage
+    - name: Check disk space
       if: (!cancelled())
       run: df -hT
 
-    - name: Upload bin directory
+    - name: Upload bin directory (artifact)
       uses: actions/upload-artifact@main
       if: steps.compile.outputs.status == 'success' && env.UPLOAD_BIN_DIR == 'true'
       with:
         name: OpenWrt_bin${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
         path: openwrt/bin
 
-    - name: Organize files
+    - name: Organize firmware files
       id: organize
       if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
       run: |
-        cd openwrt/bin/targets/*/*
+        cd openwrt/bin/targets
+        FIRMWARE_DIR=$(find . -maxdepth 2 -type d -name "generic" | head -n 1)
+        cd ${FIRMWARE_DIR}
         rm -rf packages config.buildinfo feeds.buildinfo sha256sums version.buildinfo *.manifest Packages.tar.gz
         echo "FIRMWARE=$PWD" >> $GITHUB_ENV
         echo "::setOutput name=status::success"
 
-    - name: Upload firmware directory
+    - name: Upload firmware directory (artifact)
       uses: actions/upload-artifact@main
       if: steps.organize.outputs.status == 'success' && !cancelled()
       with:
